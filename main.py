@@ -7,7 +7,7 @@ except ModuleNotFoundError:
 
 import os
 from typing import List, Tuple, Dict, Any
-
+from random import randint, choice as randchoice
 
 def cls():
     # Inter platform clear screen
@@ -23,6 +23,35 @@ db.commit()
 LOGGED_IN = False
 LOGGED_IN_AS = ""
 CURRENT_PAGE = -1
+
+first_names = [
+    "James",
+    "Robert",
+    "John",
+    "Michael",
+    "William",
+    "David",
+    "Mary",
+    "Patricia",
+    "Elizabeth",
+    "Susan",
+    "Barbara",
+]
+last_names = [
+    "Smith",
+    "Johnson",
+    "Williams",
+    "Jones",
+    "Brown",
+    "Davis",
+    "Miller",
+    "Wilson",
+    "Moore",
+    "Taylor",
+    "Anderson",
+]
+
+
 
 
 def login() -> Tuple[bool, str]:
@@ -50,18 +79,15 @@ def prompt_menu(page_name: str, choices: List[str]) -> int:
         user_choice = input("\n> ")
         try:
             user_choice = int(user_choice)
+            if user_choice < 1 or user_choice > len(choices):
+                raise ValueError
         except ValueError:
             print("Invalid choice! Try again")
             input("Press Enter to continue...")
 
             continue
         else:
-            if user_choice < 1 or user_choice > len(choices):
-                print("Invalid choice! Try again")
-                input("Press Enter to continue...")
-                continue
-            else:
-                return user_choice
+            return user_choice
 
 
 def show_table(columns: List[str], rows: List[Tuple]) -> None:
@@ -312,6 +338,23 @@ def inventory_management_menu():
         choice = -1
 
 
+def staff_management_menu():
+    global CURRENT, db
+    choice = -1
+    while True:
+        choices = ["Hire Staff", "Fire Staff", "View Staff", "View Statistics", "Promote Employee", "Demote Employee", "Go Back"]
+        if choice == -1:
+            choice = prompt_menu("Staff Management", choices)
+        cls()
+        # Hire Staff
+        if choice == 1:
+            show_table(["Name", "Date of Birth", "Past Experience", "Expected Base Pay"], [
+                (f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1940, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
+                for i in range(5)
+            ])
+            print("\n\n")
+            
+
 while True:
     try:
         cls()
@@ -336,6 +379,8 @@ while True:
                 choice = CURRENT_PAGE
             if choice == 1:
                 inventory_management_menu()
+            if choice == 2:
+                staff_management_menu()
             if choice == 4:
                 LOGGED_IN = False
                 CURRENT_PAGE = -1
