@@ -13,8 +13,8 @@ def cls():
     # Inter platform clear screen
     os.system("cls" if os.name == "nt" else "clear")
 
-
-db = connect(host="192.168.1.29", user="root", password="1234", database="bananacenter")
+# TODO: Replace ip with localhost
+db = connect(host="38.242.201.218", user="root", password="1234", database="BananaCenter")
 
 cursor = db.cursor(buffered=True)
 setup(cursor)
@@ -154,7 +154,7 @@ def inventory_management_menu():
             # View All
             if view_choice == 1:
                 cursor.execute(
-                    "SELECT model_number, name, format(price,2,'N2'), quantity, discount, format(price - discount/100 * price,2,'N2') FROM products"
+                    "SELECT model_number, name, format(price,2,'N2'), quantity, discount, format(price - discount/100 * price,2, 'N2') FROM products"
                 )
                 data = cursor.fetchall()
                 if not data:
@@ -210,7 +210,7 @@ def inventory_management_menu():
             try:
                 cursor.execute(
                     "INSERT INTO products (model_number, name, price, quantity, discount) VALUES (%s, %s, %s, %s, %s)",
-                    (input_data["Model Number"], input_data["Name"], price, float(input_data["Quantity"]), price),
+                    (input_data["Model Number"], input_data["Name"], price, float(input_data["Quantity"]), discount),
                 )
             except errors.DataError:
                 print("Invalid input! Did you enter very long values? Please try again")
@@ -224,41 +224,43 @@ def inventory_management_menu():
         elif choice == 3:
             identifier = input("Enter the model number or name of the product you want to update: ")
             cursor.execute(
-                "SELECT model_number, name, price, quantity, discount FROM products WHERE lower(model_number) LIKE '%%s%' OR lower(name) LIKE '%%s%'",
-                (identifier, identifier),
+                "SELECT model_number, name, price, quantity, discount FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
+                (f"%{identifier}%", f"%{identifier}%"),
             )
             data = cursor.fetchone()
             if not data:
                 print("No product found with that identifier!")
                 input("Press Enter to continue...")
+                choice = -1
                 continue
 
             show_table(["Model Number", "Name", "Price", "Quantity", "Discount"], [data]),
-
-            print("Edit row data. [] Indicate default value")
+            print()
+            print("Edit row data. [] Indicate current value. Leave blank to keep current value.")
             input_data = prompt_input(
-                {
-                    f"Model Number [{data[0]}]": str,
+                {},
+                {   f"Model Number [{data[0]}]": str,
                     f"Name [{data[1]}]": str,
                     f"Price [{data[2]}]": float,
                     f"Quantity [{data[3]}]": int,
-                },
-                {f"Discount [{data[4]}]": int},
+                    f"Discount [{data[4]}]": int},
             )
 
-            model_number = input_data[f"Model Number [{data[0]}]"]
-            name = input_data[f"Name [{data[1]}]"]
-            price = float(input_data[f"Price [{data[2]}]"])
-            quantity = float(input_data[f"Quantity [{data[3]}]"])
-            discount = float(input_data[f"Discount [{data[4]}]"])
+            model_number = input_data[f"Model Number [{data[0]}]"] or data[0]
+            name = input_data[f"Name [{data[1]}]"] or data[1]
+            price = float(input_data[f"Price [{data[2]}]"]) or data[2]
+            quantity = float(input_data[f"Quantity [{data[3]}]"]) or data[3]
+            discount = float(input_data[f"Discount [{data[4]}]"]) or data[4] if float(input_data[f"Discount [{data[4]}]"]) != 0 else 0
 
             if discount < 0 or discount > 100:
                 print("Discount must be between 0 and 100!")
                 input("Press Enter to continue...")
+                choice = -1
                 continue
             elif price < 0:
                 print("Price must be greater than 0!")
                 input("Press Enter to continue...")
+                choice = -1
                 continue
 
             try:
@@ -278,8 +280,8 @@ def inventory_management_menu():
         elif choice == 4:
             identifier = input("Enter the model number or name of the product you want to delete: ")
             cursor.execute(
-                "SELECT model_number, name, price, quantity, discount FROM products WHERE lower(model_number) LIKE '%%s%' OR lower(name) LIKE '%%s%'",
-                (identifier, identifier),
+                "SELECT model_number, name, price, quantity, discount FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
+                (f"%{identifier}%", f"%{identifier}%"),
             )
             data = cursor.fetchone()
             if not data:
@@ -287,8 +289,9 @@ def inventory_management_menu():
                 input("Press Enter to continue...")
                 continue
 
-            show_table(["Model Number", "Name", "Price", "Quantity", "Discount"], [data]),
-            if input("Are you sure you want to delete this product? (Y/N)").lower() == "y":
+            show_table(["Model Number", "Name", "Price", "Quantity", "Discount"], [data])
+            print("\n\n")
+            if input("Are you sure you want to delete this product? (Y/N): ").lower() == "y":
                 cursor.execute("DELETE FROM products WHERE model_number = %s", (data[0],))
                 db.commit()
                 print("\nProduct deleted!")
