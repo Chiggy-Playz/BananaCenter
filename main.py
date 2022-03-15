@@ -8,6 +8,7 @@ except ModuleNotFoundError:
 import os
 from typing import List, Tuple, Dict, Any
 from random import randint, choice as randchoice
+from datetime import datetime
 
 def cls():
     # Inter platform clear screen
@@ -348,12 +349,72 @@ def staff_management_menu():
         cls()
         # Hire Staff
         if choice == 1:
-            show_table(["Name", "Date of Birth", "Past Experience", "Expected Base Pay"], [
-                (f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1940, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
+            employees = [
+                (str(i+1),f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1940, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
                 for i in range(5)
-            ])
-            print("\n\n")
+            ]
+            show_table(["S. No", "Name", "Date of Birth", "Past Experience", "Expected Base Pay"], employees)
+            print("\n\nChoose an employee to hire by entering the S. No. of the employee. Enter 6 to go back.")
+            while True:
+                try:
+                    user_choice = input("\n> ")
+                    if int(user_choice) < 1 or int(user_choice) > 6:
+                        raise ValueError
+                except ValueError:
+                    print("Invalid input! Try again")
+                    input("Press Enter to continue...")
+                    continue
+                else:
+                    user_choice = int(user_choice)
+                    break
+                
+            if user_choice == 6:
+                choice = -1
+                continue
             
+            while True:
+                print("Setup employee login details.")
+                input_data = prompt_input(
+                    {
+                        "Username": str,
+                        "Password": str,
+                        "Confirm Password": str,
+                    },{}
+                )
+                if input_data["Password"] != input_data["Confirm Password"]:
+                    print("Passwords do not match!")
+                    input("Press Enter to continue...")
+                    continue
+                break
+            selected_employee = employees[user_choice-1]
+            try:
+                cursor.execute("INSERT INTO logins (username, password, role) VALUES (%s, %s, %s)", 
+                (input_data["Username"], input_data["Password"], "employee")
+                )
+            except errors.IntegrityError:
+                print("Username already exists!")
+                input("Press Enter to continue...")
+                continue
+
+            cursor.execute("INSERT INTO staff (name, dob, base_pay) VALUES (%s, %s, %s)",
+                (selected_employee[1],  datetime.strptime(selected_employee[2], "%d/%m/%Y").date(), float(selected_employee[4][1:]),)
+            )
+            db.commit()
+            print("\nEmployee hired!")
+            input("Press Enter to continue...")
+        
+        # Go Back
+        elif choice == 7:
+            CURRENT_PAGE = -1
+            return
+
+        else:
+            choice = -1
+        
+        choice = -1
+
+
+
 
 while True:
     try:
