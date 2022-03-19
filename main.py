@@ -15,7 +15,7 @@ def cls():
     os.system("cls" if os.name == "nt" else "clear")
 
 # TODO: Replace ip with localhost
-db = connect(host="38.242.201.218", user="root", password="1234", database="BananaCenter")
+db = connect(host="localhost", user="root", password="1234", database="BananaCenter")
 
 cursor = db.cursor(buffered=True)
 setup(cursor)
@@ -24,6 +24,7 @@ db.commit()
 LOGGED_IN = False
 LOGGED_IN_AS = ""
 CURRENT_PAGE = -1
+LOGGED_IN_ID = -1 
 
 first_names = [
     "James",
@@ -53,20 +54,32 @@ last_names = [
 ]
 
 
-
-
-def login() -> Tuple[bool, str]:
+def login() -> Tuple[bool, str, int]:
     username = input("Login Username: ")
     password = input("Login Password: ")
-    cursor.execute("SELECT role FROM logins WHERE username = %s AND password = %s", (username, password))
+    cursor.execute("SELECT role, employee_id FROM logins WHERE username = %s AND password = %s", (username, password))
     if cursor.rowcount == 1:
         print("Login Successful!")
-
-        return (True, cursor.fetchone()[0])
+        row = cursor.fetchone()
+        return (True, row[0], row[1])
     else:
         print("Login Failed!")
         input("Press Enter to retry...")
-        return (False, "")
+        return (False, "", -1)
+
+
+def prompt_input_int(input_str:str, minimum: int, maximum: int):
+    while True:
+        try:
+            user_choice = input(input_str)
+            if int(user_choice) < minimum or int(user_choice) > maximum:
+                raise ValueError
+        except ValueError:
+            print("Invalid input! Try again")
+            input("Press Enter to continue...")
+            continue
+        else:
+            return int(user_choice)
 
 
 def prompt_menu(page_name: str, choices: List[str]) -> int:
@@ -91,8 +104,9 @@ def prompt_menu(page_name: str, choices: List[str]) -> int:
             return user_choice
 
 
-def show_table(columns: List[str], rows: List[Tuple]) -> None:
-    cls()
+def show_table(columns: List[str], rows: List[Tuple], to_cls=True) -> None:
+    if to_cls:
+        cls()
     space_deltas = []
 
     for i in range(len(columns)):
@@ -165,6 +179,32 @@ def prompt_input(required_columns: dict, optional_columns: dict) -> Dict[str, An
     return result
 
 
+def search_product(return_value=False):
+    """Returns None if no product is found else Tuple of (model_number, name, price, quantity, discount, final_price)"""
+    # TODO what is 02 but 402 and 502?
+    identifier = input("Enter the model number or name of the product: ").lower()
+    if identifier == "":
+        if not return_value:
+            print("No product found with that identifier!")
+            input("Press Enter to continue...")
+        return
+        
+    cursor.execute(
+        "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
+        (f"%{identifier}%", f"%{identifier}%"),
+    )
+    data = cursor.fetchone()
+    if return_value:
+        return data
+
+    if not data:
+        print("No product found with that identifier!")
+        input("Press Enter to continue...")
+    
+    show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [data]),
+    input("\n\nPress Enter to continue...")
+
+
 def inventory_management_menu():
     global CURRENT_PAGE, db
     choice = -1
@@ -181,7 +221,7 @@ def inventory_management_menu():
             # View All
             if view_choice == 1:
                 cursor.execute(
-                    "SELECT model_number, name, format(price,2,'N2'), quantity, discount, format(price - discount/100 * price,2, 'N2') FROM products"
+                    "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products"
                 )
                 data = cursor.fetchall()
                 if not data:
@@ -202,7 +242,7 @@ def inventory_management_menu():
                 if sort_type_choice == 3:
                     continue
                 cls()
-                query = "SELECT model_number, name, format(price,2,'N2'), quantity, discount, format(price - discount/100 * price, 2, 'N2') FROM products ORDER BY {} {}".format(
+                query = "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products ORDER BY {} {}".format(
                     ["Name", "Price", "Quantity", "Discount"][sort_by_choice - 1].lower(),
                     ["ASC", "DESC"][sort_type_choice - 1].lower(),
                 )
@@ -249,19 +289,14 @@ def inventory_management_menu():
 
         # Update Product
         elif choice == 3:
-            identifier = input("Enter the model number or name of the product you want to update: ")
-            cursor.execute(
-                "SELECT model_number, name, price, quantity, discount FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
-                (f"%{identifier}%", f"%{identifier}%"),
-            )
-            data = cursor.fetchone()
+            data = search_product(return_value=True)
             if not data:
                 print("No product found with that identifier!")
                 input("Press Enter to continue...")
                 choice = -1
                 continue
 
-            show_table(["Model Number", "Name", "Price", "Quantity", "Discount"], [data]),
+            show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [data]),
             print()
             print("Edit row data. [] Indicate current value. Leave blank to keep current value.")
             input_data = prompt_input(
@@ -299,24 +334,24 @@ def inventory_management_menu():
                 print("Invalid input! Did you enter very long values? Please try again")
                 input("Press Enter to continue...")
                 continue
+            except errors.IntegrityError:
+                print("Model number already exists!")
+                input("Press Enter to continue...")
+                choice = -1
+                continue
             db.commit()
             print("\nProduct updated!")
             input("Press Enter to continue...")
 
         # Delete Product
         elif choice == 4:
-            identifier = input("Enter the model number or name of the product you want to delete: ")
-            cursor.execute(
-                "SELECT model_number, name, price, quantity, discount FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
-                (f"%{identifier}%", f"%{identifier}%"),
-            )
-            data = cursor.fetchone()
+            data = search_product(return_value=True)
             if not data:
                 print("No product found with that identifier!")
                 input("Press Enter to continue...")
                 continue
 
-            show_table(["Model Number", "Name", "Price", "Quantity", "Discount"], [data])
+            show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [data])
             print("\n\n")
             if input("Are you sure you want to delete this product? (Y/N): ").lower() == "y":
                 cursor.execute("DELETE FROM products WHERE model_number = %s", (data[0],))
@@ -340,38 +375,68 @@ def inventory_management_menu():
 
 
 def staff_management_menu():
-    global CURRENT, db
+    global CURRENT_PAGE, db
     choice = -1
     while True:
-        choices = ["Hire Staff", "Fire Staff", "View Staff", "View Statistics", "Promote Employee", "Demote Employee", "Go Back"]
+        choices = ["View Staff", "Hire Staff", "Fire Staff", "View Statistics", "Promote Employee", "Demote Employee", "Go Back"]
         if choice == -1:
             choice = prompt_menu("Staff Management", choices)
         cls()
-        # Hire Staff
+        # View Staff
         if choice == 1:
+            view_choices = ["View All", "Sort", "Back"]
+            view_choice = prompt_menu("View Staff", view_choices)
+            cls()
+            # View All
+            if view_choice == 1:
+                cursor.execute("SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff;")
+                employees = cursor.fetchall()
+                if not employees:
+                    print("No employees hired yet!")
+                else:
+                    # TODO decide what 'level' is
+                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
+                input("\nPress Enter to Continue")
+            elif view_choice == 2:
+                sort_by_choices = ["Sort by Name", "Sort by Age", "Sort by Date of Joining", "Sort by Base Salary", "Back"]
+                sort_by_choice = prompt_menu("Sort Products", sort_by_choices)
+
+                if sort_by_choice == 5:
+                    continue
+
+                sort_type_choices = ["Ascending", "Descending", "Back"]
+                sort_type_choice = prompt_menu("Sort Type", sort_type_choices)
+                if sort_type_choice == 3:
+                    continue
+                cls()
+                query = "SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff ORDER BY {} {}".format(
+                    ["Name", "Age", "doj", "base_pay"][sort_by_choice - 1].lower(),
+                    ["ASC", "DESC"][sort_type_choice - 1].lower(),
+                )
+                cursor.execute(query)
+                employees = cursor.fetchall()
+                if not employees:
+                    print("No employees hired yet!")
+                else:
+                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
+                input("\nPress Enter to continue...")
+            elif view_choice == 3:
+                pass
+        # Hire Staff
+        elif choice == 2:
             employees = [
-                (str(i+1),f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1940, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
+                (str(i+1),f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1980, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
                 for i in range(5)
             ]
             show_table(["S. No", "Name", "Date of Birth", "Past Experience", "Expected Base Pay"], employees)
             print("\n\nChoose an employee to hire by entering the S. No. of the employee. Enter 6 to go back.")
-            while True:
-                try:
-                    user_choice = input("\n> ")
-                    if int(user_choice) < 1 or int(user_choice) > 6:
-                        raise ValueError
-                except ValueError:
-                    print("Invalid input! Try again")
-                    input("Press Enter to continue...")
-                    continue
-                else:
-                    user_choice = int(user_choice)
-                    break
+            user_choice = prompt_input_int("\n> ", 1, 6)
                 
             if user_choice == 6:
                 choice = -1
                 continue
             
+            # TODO Fix
             while True:
                 print("Setup employee login details.")
                 input_data = prompt_input(
@@ -387,22 +452,52 @@ def staff_management_menu():
                     continue
                 break
             selected_employee = employees[user_choice-1]
+            cursor.execute("INSERT INTO staff (name, dob, base_pay) VALUES (%s, %s, %s)",
+                (selected_employee[1],  datetime.strptime(selected_employee[2], "%d/%m/%Y").date(), float(selected_employee[4][1:]),)
+            )
+            
             try:
-                cursor.execute("INSERT INTO logins (username, password, role) VALUES (%s, %s, %s)", 
-                (input_data["Username"], input_data["Password"], "employee")
+                cursor.execute("INSERT INTO logins (username, password, role, employee_id) VALUES (%s, %s, %s, %s)", 
+                (input_data["Username"], input_data["Password"], "employee", cursor.lastrowid)
                 )
             except errors.IntegrityError:
                 print("Username already exists!")
                 input("Press Enter to continue...")
                 continue
 
-            cursor.execute("INSERT INTO staff (name, dob, base_pay) VALUES (%s, %s, %s)",
-                (selected_employee[1],  datetime.strptime(selected_employee[2], "%d/%m/%Y").date(), float(selected_employee[4][1:]),)
-            )
             db.commit()
             print("\nEmployee hired!")
             input("Press Enter to continue...")
-        
+        # Fire Staff
+        elif choice == 3:
+            name = (input("Enter the name of the employee you want to fire: ")).lower()
+            cursor.execute(
+                "SELECT id, name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff WHERE lower(name) LIKE %s;",
+                (f"%{name}%",)
+            )
+            data = cursor.fetchall()
+            if not data:
+                print("No employee found with that name!")
+                input("Press Enter to continue...")
+                continue
+            
+            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [emp[1:] for emp in data])
+            print(f"\n\nSelect the employee you want to fire by entering the S. No. of the employee. Enter {len(data)+1} to go back.")
+            user_choice = prompt_input_int("\n> ", 1, len(data)+1)
+            if user_choice == len(data) + 1:
+                choice = -1
+                continue
+            selected_employee = data[user_choice-1]
+            print("\n\n")
+            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [selected_employee[1:]])
+            if input("\n\nAre you sure you want to fire this employee? (Y/N): ").lower() == "y":
+                cursor.execute("DELETE FROM staff WHERE id=%s", (selected_employee[0],))
+                db.commit()
+                print("\nEmployee fired!")
+                input("Press Enter to continue...")
+            else:
+                print("Employee not fired!")
+                input("Press Enter to continue...")
         # Go Back
         elif choice == 7:
             CURRENT_PAGE = -1
@@ -414,6 +509,81 @@ def staff_management_menu():
         choice = -1
 
 
+def new_sale():
+    global CURRENT_PAGE
+    # Model Number : Product Info
+    products: Dict[str, dict] = {}
+    while True:
+        cls()
+        product = search_product(return_value=True)
+        if not product:
+            print("Product not found!")
+            input("Press Enter to continue...")
+            continue
+        show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [product])
+        print("\n")
+        # Quantity check
+        if product[3] == 0:
+            print("Product is out of stock!")
+            input("Press Enter to continue...")
+            continue
+
+        elif product[3] == 1:
+            quantity = 1
+        else:
+            quantity = prompt_input_int("Enter the quantity: ", 1, product[3])
+        model_number: str = product[0]
+        products[model_number] = {"Model Number": model_number, "Name": product[1], "Price": product[2], "Quantity": quantity, "Discount": product[4], "Final Price": product[5] * quantity}
+        
+        if input("\n\nDo you want to add more products? (Y/N): ").lower() == "n":
+            break
+    # reveal_type(products) # TODO ?
+    cls()
+    while True:
+        customer_number = input("Enter the phone number of the customer: ")
+        if customer_number.isnumeric():
+            break
+        print("Invalid phone number!")
+        input("Press Enter to try again...")
+
+    cursor.execute("SELECT id, name, address, phone, email FROM customers WHERE phone=%s", (customer_number,))
+    existing_customer = cursor.fetchone()
+    if not existing_customer:
+        data = prompt_input({"Name":str, "Address": str, "Email": str}, {})
+        cursor.execute("INSERT INTO customers(name, address, phone, email) VALUES (%s, %s, %s, %s);", (data["Name"], data["Address"], customer_number, data["Email"]))
+        db.commit()
+        customer = (cursor.lastrowid, data["Name"], data["Address"], customer_number, data["Email"])
+        print("Customer added!")
+    else:
+        customer = existing_customer
+        print("Customer found!")
+    
+    payment_method = input("Enter the payment method: ")
+
+    show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"],
+    [(model_number, product["Name"], product["Price"], product["Quantity"], product["Discount"], product["Final Price"]) for model_number, product in products.items()])
+    print("\n\n")
+
+    show_table(["Name", "Address", "Phone", "Email"], [customer[1:]], to_cls=False)
+    print("\n\n")
+
+    print(f"Payment Method: {payment_method}")
+    print(f"Total Amount: {sum([product['Final Price'] for product in products.values()])}")
+    if input("\n\nAre you sure you want to proceed? (Y/N): ").lower() != "y":
+        print("Sale cancelled!")
+        input("Press Enter to continue...")
+        return
+    
+    cursor.execute("SELECT MAX(invoice_number) FROM sales;")
+    last_invoice_number = cursor.fetchone()[0] or 0
+    for model_number, product in products.items():
+        cursor.execute("INSERT INTO sales(invoice_number, employee_id, customer_id, product_model_number, quantity, base_price, discount, payment_method) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);", 
+        (last_invoice_number+1, LOGGED_IN_ID, customer[0], model_number, product["Quantity"], product["Price"], product["Discount"], payment_method))
+        cursor.execute("UPDATE products SET quantity=quantity-%s WHERE model_number=%s", (product["Quantity"], model_number))
+    db.commit()
+    print("Sale completed!")
+    input("Press Enter to continue...")
+    CURRENT_PAGE = -1
 
 
 while True:
@@ -426,6 +596,7 @@ while True:
             LOGGED_IN = login_details[0]
             if login_details[0]:
                 LOGGED_IN_AS = login_details[1]
+                LOGGED_IN_ID = login_details[2]
                 print(f"Logged in as: {LOGGED_IN_AS}")
                 print()
                 input("Press Enter to continue...")
@@ -433,6 +604,7 @@ while True:
 
         if LOGGED_IN_AS == "admin":
             if CURRENT_PAGE == -1:
+                # TODO View customers, Staff Management: Change login info
                 choices = ["Inventory Management", "Staff Management", "Sales Report", "Logout", "Exit"]
                 choice = prompt_menu("Administrator Main Menu", choices)
                 CURRENT_PAGE = choice
@@ -440,17 +612,41 @@ while True:
                 choice = CURRENT_PAGE
             if choice == 1:
                 inventory_management_menu()
-            if choice == 2:
+            elif choice == 2:
                 staff_management_menu()
-            if choice == 4:
+            elif choice == 4:
                 LOGGED_IN = False
                 CURRENT_PAGE = -1
-            if choice == 5:
+            elif choice == 5:
                 break
             else:
                 CURRENT_PAGE = -1  # TODO PROPER error
 
+        elif LOGGED_IN_AS == "employee":
+            if CURRENT_PAGE == -1:
+                choices = ["Search Prouct", "New Sale", "View Sales", "File defect claim", "Logout", "Exit"]
+                choice = prompt_menu("Employee Main Menu", choices)
+                CURRENT_PAGE = choice
+            else:
+                choice = CURRENT_PAGE
+            cls()
+            try:
+                if choice == 1:
+                    search_product()
+                if choice == 2:
+                    new_sale()
+                elif choice == 5:
+                    LOGGED_IN = False
+                    CURRENT_PAGE = -1
+                elif choice == 6:
+                    break
+            except KeyboardInterrupt:
+                pass
+            finally:
+                CURRENT_PAGE = -1
+
+
     except KeyboardInterrupt:
         continue
 
-print("Thank you for visiting BananaCenter. Have a nice day :)")
+print("Have a nice day =)")
