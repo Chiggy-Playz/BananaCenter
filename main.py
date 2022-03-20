@@ -205,6 +205,26 @@ def search_product(return_value=False):
     input("\n\nPress Enter to continue...")
 
 
+def view_sale(invoice_number):
+    cursor.execute("SELECT S.invoice_number, E.id AS 'Employee ID', E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, P.name, S.base_price, S.discount, S.quantity, S.quantity* (S.base_price - ((S.discount/100) * S.base_price)) AS 'Final Price' FROM sales S, staff E, customers C, products P WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.product_model_number = P.model_number AND S.invoice_number = %s;", (invoice_number,))
+    data = cursor.fetchall()
+    if not data:
+        print("Uh oh something went wrong. Please try again later.")
+        input("Press Enter to continue...")
+        return
+    employee_id, employee_name, customer_name, customer_phone, sale_date, payment_method = data[0][1:7]
+    cls()
+    print(f"Sale Details\n\nInvoice Number: {invoice_number}")
+    print(f"Sale made by: {employee_name} (Id: {employee_id})")
+    print(f"Customer Name: {customer_name}")
+    print(f"Customer Phone: {customer_phone}")
+    print(f"Date of Sale: {sale_date}")
+    print(f"Mode of Payment: {payment_method}")
+
+    print("\nProducts Sold:")
+    show_table(["Product Name", "Price", "Quantity", "Discount", "Final Price"], [(row[7], row[8], row[10], row[9], f"{row[11]:.2f}") for row in data] + [("","","","",""),("", "", "", "Total", f"{sum([row[11] for row in data]):.2f}")], to_cls=False)
+    input("\n\nPress Enter to continue...")
+
 def inventory_management_menu():
     global CURRENT_PAGE, db
     choice = -1
@@ -372,6 +392,38 @@ def inventory_management_menu():
             input("Press Enter to continue...")
 
         choice = -1
+
+
+def sales_report_menu():
+    
+    global CURRENT_PAGE
+    choice = -1
+    while True:
+        choices = ["View All Sales", "Sort Sales", "Filter Sales", "Back"]
+        if choice == -1:
+            choice = prompt_menu("Sales Report Menu", choices)
+        cls()
+        # View All Sales
+        if choice == 1:
+            cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id GROUP BY invoice_number ORDER BY sale_date DESC;")
+            data = cursor.fetchall()
+            if not data:
+                print("No sales made yet =(")
+                return
+
+            show_table(["Invoice Number", "Emloyee Name", "Customer Name", "Customer Phone Number", "Date of Sale", "Mode of Payment", "Total Amount"], data)
+            print("\n\nEnter the invoice number of the sale you want to view. Enter 0 to go back.")
+            invoice_number = prompt_input_int("Invoice Number: ", 0, len(data))
+            if invoice_number == 0:
+                choice = -1
+                continue
+            
+            view_sale(invoice_number)
+                        
+        else:
+            # TODO REMOVE
+            CURRENT_PAGE = -1
+            break
 
 
 def staff_management_menu():
@@ -605,7 +657,7 @@ while True:
 
         if LOGGED_IN_AS == "admin":
             if CURRENT_PAGE == -1:
-                # TODO View customers, Staff Management: Change login info
+                # TODO Staff Management: Change login info
                 choices = ["Inventory Management", "Staff Management", "Sales Report", "Logout", "Exit"]
                 choice = prompt_menu("Administrator Main Menu", choices)
                 CURRENT_PAGE = choice
@@ -615,6 +667,8 @@ while True:
                 inventory_management_menu()
             elif choice == 2:
                 staff_management_menu()
+            elif choice == 3:
+                sales_report_menu()
             elif choice == 4:
                 LOGGED_IN = False
                 CURRENT_PAGE = -1
