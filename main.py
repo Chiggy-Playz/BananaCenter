@@ -6,12 +6,14 @@ except ModuleNotFoundError:
     quit()
 
 import os
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
 from random import randint, choice as randchoice
 from datetime import datetime
 
 def cls():
     # Inter platform clear screen
+    # cls is for windows, clear is for *nix platforms like linux
+    # nt represents windows
     os.system("cls" if os.name == "nt" else "clear")
 
 # TODO: Replace ip with localhost
@@ -68,11 +70,11 @@ def login() -> Tuple[bool, str, int]:
         return (False, "", -1)
 
 
-def prompt_input_int(input_str:str, minimum: int, maximum: int):
+def prompt_input_int(input_str:str, minimum: int, maximum: Optional[int]=None):
     while True:
         try:
             user_choice = input(input_str)
-            if int(user_choice) < minimum or int(user_choice) > maximum:
+            if int(user_choice) < minimum or (maximum and int(user_choice) > maximum):
                 raise ValueError
         except ValueError:
             print("Invalid input! Try again")
@@ -205,11 +207,11 @@ def search_product(return_value=False):
     input("\n\nPress Enter to continue...")
 
 
-def view_sale(invoice_number):
+def view_detailed_sale(invoice_number):
     cursor.execute("SELECT S.invoice_number, E.id AS 'Employee ID', E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, P.name, S.base_price, S.discount, S.quantity, S.quantity* (S.base_price - ((S.discount/100) * S.base_price)) AS 'Final Price' FROM sales S, staff E, customers C, products P WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.product_model_number = P.model_number AND S.invoice_number = %s;", (invoice_number,))
     data = cursor.fetchall()
     if not data:
-        print("Uh oh something went wrong. Please try again later.")
+        print("No sale found with that invoice number!")
         input("Press Enter to continue...")
         return
     employee_id, employee_name, customer_name, customer_phone, sale_date, payment_method = data[0][1:7]
@@ -224,6 +226,22 @@ def view_sale(invoice_number):
     print("\nProducts Sold:")
     show_table(["Product Name", "Price", "Quantity", "Discount", "Final Price"], [(row[7], row[8], row[10], row[9], f"{row[11]:.2f}") for row in data] + [("","","","",""),("", "", "", "Total", f"{sum([row[11] for row in data]):.2f}")], to_cls=False)
     input("\n\nPress Enter to continue...")
+
+
+def view_multiple_sales(data):
+    if not data:
+        print("No sales made yet =(")
+        input("Press Enter to continue...")
+        return
+
+    show_table(["Invoice Number", "Emloyee Name", "Customer Name", "Customer Phone Number", "Date of Sale", "Mode of Payment", "Total Amount"], data)
+    print("\n\nEnter the invoice number of the sale you want to view. Enter 0 to go back.")
+    invoice_number = prompt_input_int("Invoice Number: ", 0)
+    if invoice_number == 0:
+        return
+        
+    view_detailed_sale(invoice_number)
+
 
 def inventory_management_menu():
     global CURRENT_PAGE, db
@@ -405,32 +423,128 @@ def sales_report_menu():
         cls()
         # View All Sales
         if choice == 1:
-            cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id GROUP BY invoice_number ORDER BY sale_date DESC;")
+            cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id GROUP BY invoice_number ORDER BY invoice_number DESC;")
             data = cursor.fetchall()
-            if not data:
-                print("No sales made yet =(")
+            view_multiple_sales(data)
+            return
+        # Sort Sales
+        elif choice == 2:
+            sort_by_choices = ["Sort by Date of Sale", "Sort by Total Amount", "Back"]
+            sort_by_choice = prompt_menu("Sort Sales", sort_by_choices)
+            
+            if sort_by_choice == 3:
                 return
+                
+            sort_type_choices = ["Ascending", "Descending", "Back"]
+            sort_type_choice = prompt_menu("Sort Type", sort_type_choices)
 
-            show_table(["Invoice Number", "Emloyee Name", "Customer Name", "Customer Phone Number", "Date of Sale", "Mode of Payment", "Total Amount"], data)
-            print("\n\nEnter the invoice number of the sale you want to view. Enter 0 to go back.")
-            invoice_number = prompt_input_int("Invoice Number: ", 0, len(data))
-            if invoice_number == 0:
-                choice = -1
+            if sort_type_choice == 3:
                 continue
             
-            view_sale(invoice_number)
-                        
-        else:
-            # TODO REMOVE
+            cls()
+            query = "SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id GROUP BY invoice_number ORDER BY {} {};".format(
+                ["sale_date", "Total Amount"][sort_by_choice - 1],
+                ["ASC", "DESC"][sort_type_choice - 1],
+            )
+            cursor.execute(query)
+            data = cursor.fetchall()
+
+            view_multiple_sales(data)
+            return
+        # Filter Sales
+        elif choice == 3:
+            filter_by_choices = ["Filter by Employee Name", "Filter by Customer Name", "Filter by Product Name", "Filter by Payment Method", "Back"]
+            filter_by_choice = prompt_menu("Filter Sales", filter_by_choices)
+            
+            cls()
+            if filter_by_choice == 1:
+                employee_name = input("Enter the employee name: ").lower()
+                cursor.execute("SELECT id, name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age' FROM staff WHERE lower(name) LIKE %s", (f"%{employee_name}%",))
+                employees = cursor.fetchall()
+                # No employee found
+                if not employees:
+                    print("No employee found with that name!")
+                    input("Press Enter to continue...")
+                    continue
+                # Exactly 1 employee found
+                elif len(employees) == 1:
+                    employee = employees[0]
+                # Multiple employees found
+                else:
+                    show_table(["S. No", "ID", "Name", "Age"], [(i+1, employee[0], employee[1], f"{employee[2]} Years") for i, employee in enumerate(employees)])
+                    print("\n\n")
+                    employee_id = prompt_input_int("S. No: ", 1, len(employees))
+                    employee = employees[employee_id - 1]
+                
+                cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.employee_id = %s GROUP BY invoice_number ORDER BY sale_date DESC;", (employee[0],))
+                data = cursor.fetchall()
+                view_multiple_sales(data)
+                return
+            elif filter_by_choice == 2:
+                customer_identifier = input("Enter the customer name or phone :  ").lower()
+                cursor.execute("SELECT id, name, phone FROM customers WHERE lower(name) LIKE %s OR phone LIKE %s", (f"%{customer_identifier}%", f"%{customer_identifier}%"))
+                customers = cursor.fetchall()
+                # No customer found
+                if not customers:
+                    print("No customer found with that name!")
+                    input("Press Enter to continue...")
+                    continue
+                # Exactly one customer found
+                elif len(customers) == 1:
+                    customer = customers[0]
+                # Multiple customers found
+                else:
+                    show_table(["S. No", "ID", "Name", "Phone"], [(i+1, customer[0], customer[1], customer[2]) for i, customer in enumerate(customers)])
+                    print("\n\n")
+                    customer_id = prompt_input_int("S. No: ", 1, len(customers))
+                    customer = customers[customer_id - 1]
+                
+                cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.customer_id = %s GROUP BY invoice_number ORDER BY sale_date DESC;", (customer[0],))
+                data = cursor.fetchall()
+                view_multiple_sales(data)
+                return
+            elif filter_by_choice == 3:
+                product_identifier = input("Enter the product name or model number: ").lower()
+                cursor.execute("SELECT name, model_number, price, quantity FROM products WHERE lower(name) LIKE %s OR lower(model_number) LIKE %s", (f"%{product_identifier}%", f"%{product_identifier}%"))
+                products = cursor.fetchall()
+                # No product found
+                if not products:
+                    print("No product found with that identifier!")
+                    input("Press Enter to continue...")
+                    continue
+                # Exactly one product found
+                elif len(products) == 1:
+                    product = products[0]
+                # Multiple products found
+                else: 
+                    show_table(["S. No", "Name", "Model Number", "Price", "Quantity"], [(i+1, product[0], product[1], product[2], product[3]) for i, product in enumerate(products)])
+                    print("\n\n")
+                    product_id = prompt_input_int("S. No: ", 1, len(products))
+                    product = products[product_id - 1]
+
+                cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C, products P WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.product_model_number = P.model_number AND S.product_model_number = %s GROUP BY invoice_number ORDER BY sale_date DESC;", (product[1],))
+                data = cursor.fetchall()
+                view_multiple_sales(data)
+                return
+            elif filter_by_choice == 4:
+                payment_method = input("Enter the payment method: ").lower()
+                cursor.execute("SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.payment_method LIKE %s GROUP BY invoice_number ORDER BY sale_date DESC;", (f"%{payment_method}%",))
+                data = cursor.fetchall()
+                view_multiple_sales(data)
+                return
+            elif filter_by_choice == 5:
+                return
+        # Go back
+        elif choice == 4:
             CURRENT_PAGE = -1
-            break
+            return
 
 
 def staff_management_menu():
     global CURRENT_PAGE, db
     choice = -1
     while True:
-        choices = ["View Staff", "Hire Staff", "Fire Staff", "View Statistics", "Promote Employee", "Demote Employee", "Go Back"]
+        choices = ["View Staff", "Hire Staff", "Fire Staff", "Go Back"]
         if choice == -1:
             choice = prompt_menu("Staff Management", choices)
         cls()
@@ -449,6 +563,7 @@ def staff_management_menu():
                     # TODO decide what 'level' is
                     show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
                 input("\nPress Enter to Continue")
+            # Sort
             elif view_choice == 2:
                 sort_by_choices = ["Sort by Name", "Sort by Age", "Sort by Date of Joining", "Sort by Base Salary", "Back"]
                 sort_by_choice = prompt_menu("Sort Products", sort_by_choices)
@@ -472,6 +587,7 @@ def staff_management_menu():
                 else:
                     show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
                 input("\nPress Enter to continue...")
+            # Back
             elif view_choice == 3:
                 pass
         # Hire Staff
@@ -552,12 +668,9 @@ def staff_management_menu():
                 print("Employee not fired!")
                 input("Press Enter to continue...")
         # Go Back
-        elif choice == 7:
+        elif choice == 4:
             CURRENT_PAGE = -1
             return
-
-        else:
-            choice = -1
         
         choice = -1
 
@@ -710,7 +823,6 @@ while True:
             finally:
                 CURRENT_PAGE = -1
 
-
     except KeyboardInterrupt:
         if not LOGGED_IN:
             cls()
@@ -718,3 +830,5 @@ while True:
         continue
 
 print("Have a nice day =)")
+
+# TODO what if employee is fired after making sale
