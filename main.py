@@ -491,6 +491,7 @@ def staff_management_menu():
             print("\n\n")
             show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [selected_employee[1:]])
             if input("\n\nAre you sure you want to fire this employee? (Y/N): ").lower() == "y":
+                cursor.execute("DELETE FROM logins WHERE employee_id=%s", (selected_employee[0],))
                 cursor.execute("DELETE FROM staff WHERE id=%s", (selected_employee[0],))
                 db.commit()
                 print("\nEmployee fired!")
@@ -633,8 +634,18 @@ while True:
             try:
                 if choice == 1:
                     search_product()
-                if choice == 2:
+                elif choice == 2:
                     new_sale()
+                elif choice == 3:
+                    cursor.execute("SELECT DISTINCT invoice_number FROM sales WHERE employee_id=%s", (LOGGED_IN_ID,))
+                    sales_by_emp = cursor.fetchall()
+                    if not sales_by_emp:
+                        print("You have made no sales yet. Get back to work.")
+                        input("Press Enter to continue...")
+                        CURRENT_PAGE = -1
+                        continue
+                    print(f"You have made {len(sales_by_emp)} sales.")
+                    input("Press Enter to continue...")
                 elif choice == 5:
                     LOGGED_IN = False
                     CURRENT_PAGE = -1
@@ -647,6 +658,9 @@ while True:
 
 
     except KeyboardInterrupt:
+        if not LOGGED_IN:
+            cls()
+            break
         continue
 
 print("Have a nice day =)")
