@@ -183,7 +183,6 @@ def prompt_input(required_columns: dict, optional_columns: dict) -> Dict[str, An
 
 def search_product(return_value=False):
     """Returns None if no product is found else Tuple of (model_number, name, price, quantity, discount, final_price)"""
-    # TODO what is 02 but 402 and 502?
     identifier = input("Enter the model number or name of the product: ").lower()
     if identifier == "":
         if not return_value:
@@ -195,7 +194,14 @@ def search_product(return_value=False):
         "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
         (f"%{identifier}%", f"%{identifier}%"),
     )
-    data = cursor.fetchone()
+    data = cursor.fetchall()
+
+    if len(data) > 1:
+        show_table(["S. No", "Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [(i+1, row[0], row[1], row[2], row[3], row[4], row[5]) for i, row in enumerate(data)], False)
+        print("\n\n")
+        user_choice = prompt_input_int("Choose a product: ", 1, len(data))
+        data = data[user_choice - 1]
+
     if return_value:
         return data
 
@@ -412,6 +418,140 @@ def inventory_management_menu():
         choice = -1
 
 
+def staff_management_menu():
+    global CURRENT_PAGE, db
+    choice = -1
+    while True:
+        choices = ["View Staff", "Hire Staff", "Fire Staff", "Go Back"]
+        if choice == -1:
+            choice = prompt_menu("Staff Management", choices)
+        cls()
+        # View Staff
+        if choice == 1:
+            view_choices = ["View All", "Sort", "Back"]
+            view_choice = prompt_menu("View Staff", view_choices)
+            cls()
+            # View All
+            if view_choice == 1:
+                cursor.execute("SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff;")
+                employees = cursor.fetchall()
+                if not employees:
+                    print("No employees hired yet!")
+                else:
+                    # TODO decide what 'level' is
+                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
+                input("\nPress Enter to Continue")
+            # Sort
+            elif view_choice == 2:
+                sort_by_choices = ["Sort by Name", "Sort by Age", "Sort by Date of Joining", "Sort by Base Salary", "Back"]
+                sort_by_choice = prompt_menu("Sort Products", sort_by_choices)
+
+                if sort_by_choice == 5:
+                    continue
+
+                sort_type_choices = ["Ascending", "Descending", "Back"]
+                sort_type_choice = prompt_menu("Sort Type", sort_type_choices)
+                if sort_type_choice == 3:
+                    continue
+                cls()
+                query = "SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff ORDER BY {} {}".format(
+                    ["Name", "Age", "doj", "base_pay"][sort_by_choice - 1].lower(),
+                    ["ASC", "DESC"][sort_type_choice - 1].lower(),
+                )
+                cursor.execute(query)
+                employees = cursor.fetchall()
+                if not employees:
+                    print("No employees hired yet!")
+                else:
+                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
+                input("\nPress Enter to continue...")
+            # Back
+            elif view_choice == 3:
+                pass
+        # Hire Staff
+        elif choice == 2:
+            employees = [
+                (str(i+1),f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1980, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
+                for i in range(5)
+            ]
+            show_table(["S. No", "Name", "Date of Birth", "Past Experience", "Expected Base Pay"], employees)
+            print("\n\nChoose an employee to hire by entering the S. No. of the employee. Enter 6 to go back.")
+            user_choice = prompt_input_int("\n> ", 1, 6)
+                
+            if user_choice == 6:
+                choice = -1
+                continue
+            
+            while True:
+                print("Setup employee login details.")
+                input_data = prompt_input(
+                    {
+                        "Username": str,
+                        "Password": str,
+                        "Confirm Password": str,
+                    },{}
+                )
+                if input_data["Password"] != input_data["Confirm Password"]:
+                    print("Passwords do not match!")
+                    input("Press Enter to continue...")
+                    continue
+                break
+            selected_employee = employees[user_choice-1]
+            cursor.execute("INSERT INTO staff (name, dob, base_pay) VALUES (%s, %s, %s)",
+                (selected_employee[1],  datetime.strptime(selected_employee[2], "%d/%m/%Y").date(), float(selected_employee[4][1:]),)
+            )
+            
+            try:
+                cursor.execute("INSERT INTO logins (username, password, role, employee_id) VALUES (%s, %s, %s, %s)", 
+                (input_data["Username"], input_data["Password"], "employee", cursor.lastrowid)
+                )
+            except errors.IntegrityError:
+                print("Username already exists!")
+                input("Press Enter to continue...")
+                continue
+
+            db.commit()
+            print("\nEmployee hired!")
+            input("Press Enter to continue...")
+        # Fire Staff
+        elif choice == 3:
+            name = (input("Enter the name of the employee you want to fire: ")).lower()
+            cursor.execute(
+                "SELECT id, name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff WHERE lower(name) LIKE %s;",
+                (f"%{name}%",)
+            )
+            data = cursor.fetchall()
+            if not data:
+                print("No employee found with that name!")
+                input("Press Enter to continue...")
+                continue
+            
+            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [emp[1:] for emp in data])
+            print(f"\n\nSelect the employee you want to fire by entering the S. No. of the employee. Enter {len(data)+1} to go back.")
+            user_choice = prompt_input_int("\n> ", 1, len(data)+1)
+            if user_choice == len(data) + 1:
+                choice = -1
+                continue
+            selected_employee = data[user_choice-1]
+            print("\n\n")
+            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [selected_employee[1:]])
+            if input("\n\nAre you sure you want to fire this employee? (Y/N): ").lower() == "y":
+                cursor.execute("DELETE FROM logins WHERE employee_id=%s", (selected_employee[0],))
+                cursor.execute("DELETE FROM staff WHERE id=%s", (selected_employee[0],))
+                db.commit()
+                print("\nEmployee fired!")
+                input("Press Enter to continue...")
+            else:
+                print("Employee not fired!")
+                input("Press Enter to continue...")
+        # Go Back
+        elif choice == 4:
+            CURRENT_PAGE = -1
+            return
+        
+        choice = -1
+
+
 def sales_report_menu():
     
     global CURRENT_PAGE
@@ -540,141 +680,6 @@ def sales_report_menu():
             return
 
 
-def staff_management_menu():
-    global CURRENT_PAGE, db
-    choice = -1
-    while True:
-        choices = ["View Staff", "Hire Staff", "Fire Staff", "Go Back"]
-        if choice == -1:
-            choice = prompt_menu("Staff Management", choices)
-        cls()
-        # View Staff
-        if choice == 1:
-            view_choices = ["View All", "Sort", "Back"]
-            view_choice = prompt_menu("View Staff", view_choices)
-            cls()
-            # View All
-            if view_choice == 1:
-                cursor.execute("SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff;")
-                employees = cursor.fetchall()
-                if not employees:
-                    print("No employees hired yet!")
-                else:
-                    # TODO decide what 'level' is
-                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
-                input("\nPress Enter to Continue")
-            # Sort
-            elif view_choice == 2:
-                sort_by_choices = ["Sort by Name", "Sort by Age", "Sort by Date of Joining", "Sort by Base Salary", "Back"]
-                sort_by_choice = prompt_menu("Sort Products", sort_by_choices)
-
-                if sort_by_choice == 5:
-                    continue
-
-                sort_type_choices = ["Ascending", "Descending", "Back"]
-                sort_type_choice = prompt_menu("Sort Type", sort_type_choices)
-                if sort_type_choice == 3:
-                    continue
-                cls()
-                query = "SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff ORDER BY {} {}".format(
-                    ["Name", "Age", "doj", "base_pay"][sort_by_choice - 1].lower(),
-                    ["ASC", "DESC"][sort_type_choice - 1].lower(),
-                )
-                cursor.execute(query)
-                employees = cursor.fetchall()
-                if not employees:
-                    print("No employees hired yet!")
-                else:
-                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
-                input("\nPress Enter to continue...")
-            # Back
-            elif view_choice == 3:
-                pass
-        # Hire Staff
-        elif choice == 2:
-            employees = [
-                (str(i+1),f"{randchoice(first_names)} {randchoice(last_names)}", f"{randint(1, 31)}/{randint(1, 12)}/{randint(1980, 2000)}", f"{randint(1,5)} Years", f"₹{randint(3,8) * 1000}") 
-                for i in range(5)
-            ]
-            show_table(["S. No", "Name", "Date of Birth", "Past Experience", "Expected Base Pay"], employees)
-            print("\n\nChoose an employee to hire by entering the S. No. of the employee. Enter 6 to go back.")
-            user_choice = prompt_input_int("\n> ", 1, 6)
-                
-            if user_choice == 6:
-                choice = -1
-                continue
-            
-            # TODO Fix
-            while True:
-                print("Setup employee login details.")
-                input_data = prompt_input(
-                    {
-                        "Username": str,
-                        "Password": str,
-                        "Confirm Password": str,
-                    },{}
-                )
-                if input_data["Password"] != input_data["Confirm Password"]:
-                    print("Passwords do not match!")
-                    input("Press Enter to continue...")
-                    continue
-                break
-            selected_employee = employees[user_choice-1]
-            cursor.execute("INSERT INTO staff (name, dob, base_pay) VALUES (%s, %s, %s)",
-                (selected_employee[1],  datetime.strptime(selected_employee[2], "%d/%m/%Y").date(), float(selected_employee[4][1:]),)
-            )
-            
-            try:
-                cursor.execute("INSERT INTO logins (username, password, role, employee_id) VALUES (%s, %s, %s, %s)", 
-                (input_data["Username"], input_data["Password"], "employee", cursor.lastrowid)
-                )
-            except errors.IntegrityError:
-                print("Username already exists!")
-                input("Press Enter to continue...")
-                continue
-
-            db.commit()
-            print("\nEmployee hired!")
-            input("Press Enter to continue...")
-        # Fire Staff
-        elif choice == 3:
-            name = (input("Enter the name of the employee you want to fire: ")).lower()
-            cursor.execute(
-                "SELECT id, name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff WHERE lower(name) LIKE %s;",
-                (f"%{name}%",)
-            )
-            data = cursor.fetchall()
-            if not data:
-                print("No employee found with that name!")
-                input("Press Enter to continue...")
-                continue
-            
-            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [emp[1:] for emp in data])
-            print(f"\n\nSelect the employee you want to fire by entering the S. No. of the employee. Enter {len(data)+1} to go back.")
-            user_choice = prompt_input_int("\n> ", 1, len(data)+1)
-            if user_choice == len(data) + 1:
-                choice = -1
-                continue
-            selected_employee = data[user_choice-1]
-            print("\n\n")
-            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [selected_employee[1:]])
-            if input("\n\nAre you sure you want to fire this employee? (Y/N): ").lower() == "y":
-                cursor.execute("DELETE FROM logins WHERE employee_id=%s", (selected_employee[0],))
-                cursor.execute("DELETE FROM staff WHERE id=%s", (selected_employee[0],))
-                db.commit()
-                print("\nEmployee fired!")
-                input("Press Enter to continue...")
-            else:
-                print("Employee not fired!")
-                input("Press Enter to continue...")
-        # Go Back
-        elif choice == 4:
-            CURRENT_PAGE = -1
-            return
-        
-        choice = -1
-
-
 def new_sale():
     global CURRENT_PAGE
     # Model Number : Product Info
@@ -703,7 +708,6 @@ def new_sale():
         
         if input("\n\nDo you want to add more products? (Y/N): ").lower() == "n":
             break
-    # reveal_type(products) # TODO ?
     cls()
     while True:
         customer_number = input("Enter the phone number of the customer: ")
@@ -787,8 +791,6 @@ while True:
                 CURRENT_PAGE = -1
             elif choice == 5:
                 break
-            else:
-                CURRENT_PAGE = -1  # TODO PROPER error
 
         elif LOGGED_IN_AS == "employee":
             if CURRENT_PAGE == -1:
