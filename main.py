@@ -100,11 +100,11 @@ def prompt_menu(page_name: str, choices: List[str]) -> int:
             return user_choice
 
 
-def show_table(columns: List[str], rows: List[Tuple], to_cls=True) -> None:
+def show_table(columns: List[str], rows: List[Tuple], to_cls=True, return_string=False) -> Optional[str]:
     if to_cls:
         cls()
     space_deltas = []
-
+    s = ""
     for i in range(len(columns)):
         col_name = columns[i]
         max_row = max(rows, key=lambda x: len(str(x[i])))
@@ -112,33 +112,53 @@ def show_table(columns: List[str], rows: List[Tuple], to_cls=True) -> None:
         space_deltas.append(delta + 1)
 
     # ----------
-    print("+", end="")
+    # print("+", end="")
+    s = "+"
     for i, col in enumerate(columns):
-        print(f"-" * (len(col) + space_deltas[i] + 1), end="")
-        print("+", end="")
-    print()
+        # print(f"-" * (len(col) + space_deltas[i] + 1), end="")
+        # print("+", end="")
+        s += f"-" * (len(col) + space_deltas[i] + 1)
+        s += "+"
+    # print()
+    s += "\n"
     # Columns
     for i, col in enumerate(columns):
-        print("| ", end="")
-        print(f"{col}" + " " * space_deltas[i], end="")
-    print("|\n", end="")
+        # print("| ", end="")
+        # print(f"{col}" + " " * space_deltas[i], end="")
+        s += "| "
+        s += f"{col}" + " " * space_deltas[i]
+    # print("|\n", end="")
+    s += "|\n"
     # ---------
-    print("|", end="")
+    # print("|", end="")
+    s += "|"
     for i, col in enumerate(columns):
-        print(f"-" * (len(col) + space_deltas[i] + 1), end="")
-        print("+" if i != len(columns) - 1 else "|", end="")
+        # print(f"-" * (len(col) + space_deltas[i] + 1), end="")
+        # print("+" if i != len(columns) - 1 else "|", end="")
+        s += f"-" * (len(col) + space_deltas[i] + 1)
+        s += "+" if i != len(columns) - 1 else "|"
     # Rows
     for i, row in enumerate(rows):
-        print("\n| ", end="")
+        # print("\n| ", end="")
+        s += "\n| "
         for j, col in enumerate(row):
-            print(f"{col}" + " " * (space_deltas[j] - len(str(col)) + len(columns[j])), end="")
-            print("| ", end="")
+            # print(f"{col}" + " " * (space_deltas[j] - len(str(col)) + len(columns[j])), end="")
+            # print("| ", end="")
+            s += f"{col}" + " " * (space_deltas[j] - len(str(col)) + len(columns[j]))
+            s += "| "
     # ----------
-    print()
-    print("+", end="")
+    # print()
+    s += "\n"
+    # print("+", end="")
+    s += "+"
     for i, col in enumerate(columns):
-        print(f"-" * (len(col) + space_deltas[i] + 1), end="")
-        print("+", end="")
+        # print(f"-" * (len(col) + space_deltas[i] + 1), end="")
+        # print("+", end="")
+        s += f"-" * (len(col) + space_deltas[i] + 1)
+        s += "+"
+    if return_string:
+        return s
+    print(s)
 
 
 def prompt_input(required_columns: dict, optional_columns: dict) -> Dict[str, Any]:
@@ -210,24 +230,32 @@ def search_product(return_value=False):
     input("\n\nPress Enter to continue...")
 
 
-def view_detailed_sale(invoice_number):
+def get_detailed_sale(invoice_number):
     cursor.execute("SELECT S.invoice_number, E.id AS 'Employee ID', E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, P.name, S.base_price, S.discount, S.quantity, S.quantity* (S.base_price - ((S.discount/100) * S.base_price)) AS 'Final Price' FROM sales S, staff E, customers C, products P WHERE S.employee_id = E.id AND S.customer_id = C.id AND S.product_model_number = P.model_number AND S.invoice_number = %s;", (invoice_number,))
     data = cursor.fetchall()
     if not data:
+        return
+    employee_id, employee_name, customer_name, customer_phone, sale_date, payment_method = data[0][1:7]
+    s =  f"Sale Details\n\nInvoice Number: {invoice_number}\n"
+    s += f"Sale made by: {employee_name} (Id: {employee_id})\n"
+    s += f"Customer Name: {customer_name}\n"
+    s += f"Customer Phone: {customer_phone}\n"
+    s += f"Date of Sale: {sale_date}\n"
+    s += f"Mode of Payment: {payment_method}\n"
+    s += f"\nProducts Sold:\n"
+    s +=  show_table(["Product Name", "Price", "Quantity", "Discount", "Final Price"], [(row[7], row[8], row[10], row[9], f"{row[11]:.2f}") for row in data] + [("","","","",""),("", "", "", "Total", f"{sum([row[11] for row in data]):.2f}")], to_cls=False, return_string=True)  # type: ignore
+    return s
+
+
+def view_detailed_sale(invoice_number):
+    
+    cls()
+    s = get_detailed_sale(invoice_number)
+    if not s:
         print("No sale found with that invoice number!")
         input("Press Enter to continue...")
         return
-    employee_id, employee_name, customer_name, customer_phone, sale_date, payment_method = data[0][1:7]
-    cls()
-    print(f"Sale Details\n\nInvoice Number: {invoice_number}")
-    print(f"Sale made by: {employee_name} (Id: {employee_id})")
-    print(f"Customer Name: {customer_name}")
-    print(f"Customer Phone: {customer_phone}")
-    print(f"Date of Sale: {sale_date}")
-    print(f"Mode of Payment: {payment_method}")
-
-    print("\nProducts Sold:")
-    show_table(["Product Name", "Price", "Quantity", "Discount", "Final Price"], [(row[7], row[8], row[10], row[9], f"{row[11]:.2f}") for row in data] + [("","","","",""),("", "", "", "Total", f"{sum([row[11] for row in data]):.2f}")], to_cls=False)
+    print(s)
     input("\n\nPress Enter to continue...")
 
 
@@ -561,7 +589,7 @@ def sales_report_menu():
     global CURRENT_PAGE
     choice = -1
     while True:
-        choices = ["View All Sales", "Sort Sales", "Filter Sales", "Back"]
+        choices = ["View All Sales", "Sort Sales", "Filter Sales", "Export sale detail to text file", "Back"]
         if choice == -1:
             choice = prompt_menu("Sales Report Menu", choices)
         cls()
@@ -678,8 +706,31 @@ def sales_report_menu():
                 return
             elif filter_by_choice == 5:
                 return
-        # Go back
+        # Export Sale
         elif choice == 4:
+            print("\n\nEnter the invoice number of the sale you want to view. Enter 0 to go back.")
+            invoice_number = prompt_input_int("Invoice Number: ", 0)
+            if invoice_number == 0:
+                CURRENT_PAGE = -1
+                return
+            s = get_detailed_sale(invoice_number)
+            if not s:
+                print("No sale found with that invoice number!")
+                input("Press Enter to continue...")
+                CURRENT_PAGE = -1
+                return
+            # Create sales folder if it doesn't exist
+            if not os.path.exists("Sales"):
+                os.mkdir("Sales")
+            
+            with open(f"Sales/Sale_{invoice_number}.txt", "w+") as f:
+                f.write(s)
+            print(f"Sale saved to Sales/Sale_{invoice_number}.txt")
+            input("Press Enter to continue...")
+            CURRENT_PAGE = -1
+            return
+        # Go back
+        elif choice == 5:
             CURRENT_PAGE = -1
             return
 
@@ -850,5 +901,3 @@ with connect(host="localhost", user="root", password="1234") as db:
     main()
 
 print("Have a nice day =)")
-
-# TODO Add export sale to txt
