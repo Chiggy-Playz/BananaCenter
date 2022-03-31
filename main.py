@@ -364,7 +364,11 @@ def inventory_management_menu():
                 input("Press Enter to continue...")
                 choice = -1
                 continue
-
+            elif quantity < 0:
+                print("Quantity must be greater than 0!")
+                input("Press Enter to continue...")
+                choice = -1
+                continue
             try:
                 cursor.execute(
                     "UPDATE products SET model_number = %s, name = %s, price = %s, quantity = %s, discount = %s WHERE model_number = %s",
