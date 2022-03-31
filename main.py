@@ -438,13 +438,12 @@ def staff_management_menu():
             cls()
             # View All
             if view_choice == 1:
-                cursor.execute("SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff;")
+                cursor.execute("SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay FROM staff WHERE fired = 0;")
                 employees = cursor.fetchall()
                 if not employees:
                     print("No employees hired yet!")
                 else:
-                    # TODO decide what 'level' is
-                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
+                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary"], [(i+1,*emp) for i, emp in enumerate(employees)])
                 input("\nPress Enter to Continue")
             # Sort
             elif view_choice == 2:
@@ -459,7 +458,7 @@ def staff_management_menu():
                 if sort_type_choice == 3:
                     continue
                 cls()
-                query = "SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff ORDER BY {} {}".format(
+                query = "SELECT name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay FROM staff WHERE fired = 0 ORDER BY {} {}".format(
                     ["Name", "Age", "doj", "base_pay"][sort_by_choice - 1].lower(),
                     ["ASC", "DESC"][sort_type_choice - 1].lower(),
                 )
@@ -468,7 +467,7 @@ def staff_management_menu():
                 if not employees:
                     print("No employees hired yet!")
                 else:
-                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,*emp) for i, emp in enumerate(employees)])
+                    show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary"], [(i+1,*emp) for i, emp in enumerate(employees)])
                 input("\nPress Enter to continue...")
             # Back
             elif view_choice == 3:
@@ -522,7 +521,7 @@ def staff_management_menu():
         elif choice == 3:
             name = (input("Enter the name of the employee you want to fire: ")).lower()
             cursor.execute(
-                "SELECT id, name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay, level FROM staff WHERE lower(name) LIKE %s;",
+                "SELECT id, name, floor(DATEDIFF(CURRENT_DATE, dob)/365) AS 'Age', doj, base_pay FROM staff WHERE fired = 0 AND lower(name) LIKE %s;",
                 (f"%{name}%",)
             )
             data = cursor.fetchall()
@@ -531,7 +530,7 @@ def staff_management_menu():
                 input("Press Enter to continue...")
                 continue
             
-            show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,) + emp[1:] for i, emp in enumerate(data)])
+            show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary"], [(i+1,) + emp[1:] for i, emp in enumerate(data)])
             print(f"\n\nSelect the employee you want to fire by entering the S. No. of the employee. Enter 0 to go back.")
             user_choice = prompt_input_int("\n> ", 0, len(data))
             if user_choice == 0:
@@ -539,10 +538,10 @@ def staff_management_menu():
                 continue
             selected_employee = data[user_choice-1]
             print("\n\n")
-            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [selected_employee[1:]])
+            show_table(["Name", "Age", "Date of Joining", "Base Salary"], [selected_employee[1:]])
             if input("\n\nAre you sure you want to fire this employee? (Y/N): ").lower() == "y":
                 cursor.execute("DELETE FROM logins WHERE employee_id=%s", (selected_employee[0],))
-                cursor.execute("DELETE FROM staff WHERE id=%s", (selected_employee[0],))
+                cursor.execute("UPDATE staff SET fired = 1 WHERE id=%s", (selected_employee[0],))
                 db.commit()
                 print("\nEmployee fired!")
                 input("Press Enter to continue...")
@@ -852,7 +851,4 @@ with connect(host="localhost", user="root", password="1234") as db:
 
 print("Have a nice day =)")
 
-# TODO what if employee is fired after making sale
-# TODO Same for product
-# TODO Remove employee level
 # TODO Add export sale to txt

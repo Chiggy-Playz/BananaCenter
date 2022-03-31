@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS staff (
     name VARCHAR(50) NOT NULL,
     dob DATE NOT NULL,
     base_pay DECIMAL(10,2) NOT NULL,
-    level INT NOT NULL DEFAULT 0,
+    fired BOOL NOT NULL DEFAULT false,
     doj DATE NOT NULL DEFAULT (CURRENT_DATE)
 );
 """
