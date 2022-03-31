@@ -57,7 +57,6 @@ CREATE TABLE IF NOT EXISTS sales (
 
 
 def setup(cur):
-
     cur.execute(logins_table)
     cur.execute(inventory_table)
     cur.execute(staff_table)

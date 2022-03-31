@@ -10,23 +10,10 @@ from typing import List, Tuple, Dict, Any, Optional
 from random import randint, choice as randchoice
 from datetime import datetime
 
-def cls():
-    # Inter platform clear screen
-    # cls is for windows, clear is for *nix platforms like linux
-    # nt represents windows
-    os.system("cls" if os.name == "nt" else "clear")
-
-# TODO: Replace ip with localhost
-db = connect(host="localhost", user="root", password="1234", database="BananaCenter")
-
-cursor = db.cursor(buffered=True)
-setup(cursor)
-db.commit()
-
 LOGGED_IN = False
 LOGGED_IN_AS = ""
 CURRENT_PAGE = -1
-LOGGED_IN_ID = -1 
+LOGGED_IN_ID = -1
 
 first_names = [
     "James",
@@ -54,6 +41,13 @@ last_names = [
     "Taylor",
     "Anderson",
 ]
+
+
+def cls():
+    # Inter platform clear screen
+    # cls is for windows, clear is for *nix platforms like linux
+    # nt represents windows
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def login() -> Tuple[bool, str, int]:
@@ -201,6 +195,8 @@ def search_product(return_value=False):
         print("\n\n")
         user_choice = prompt_input_int("Choose a product: ", 1, len(data))
         data = data[user_choice - 1]
+    elif len(data) == 1:
+        data = data[0]
 
     if return_value:
         return data
@@ -756,81 +752,95 @@ def new_sale():
     CURRENT_PAGE = -1
 
 
-while True:
-    try:
-        cls()
-        print("Welcome to BananaCenter".center(100), "\n\n")
-
-        if not LOGGED_IN:
-            login_details = login()
-            LOGGED_IN = login_details[0]
-            if login_details[0]:
-                LOGGED_IN_AS = login_details[1]
-                LOGGED_IN_ID = login_details[2]
-                print(f"Logged in as: {LOGGED_IN_AS}")
-                print()
-                input("Press Enter to continue...")
-            continue
-
-        if LOGGED_IN_AS == "admin":
-            if CURRENT_PAGE == -1:
-                # TODO Staff Management: Change login info
-                choices = ["Inventory Management", "Staff Management", "Sales Report", "Logout", "Exit"]
-                choice = prompt_menu("Administrator Main Menu", choices)
-                CURRENT_PAGE = choice
-            else:
-                choice = CURRENT_PAGE
-            if choice == 1:
-                inventory_management_menu()
-            elif choice == 2:
-                staff_management_menu()
-            elif choice == 3:
-                sales_report_menu()
-            elif choice == 4:
-                LOGGED_IN = False
-                CURRENT_PAGE = -1
-            elif choice == 5:
-                break
-
-        elif LOGGED_IN_AS == "employee":
-            if CURRENT_PAGE == -1:
-                choices = ["Search Prouct", "New Sale", "View Sales", "File defect claim", "Logout", "Exit"]
-                choice = prompt_menu("Employee Main Menu", choices)
-                CURRENT_PAGE = choice
-            else:
-                choice = CURRENT_PAGE
+def main():
+    global LOGGED_IN, LOGGED_IN_AS, LOGGED_IN_ID, CURRENT_PAGE
+    while True:
+        try:
             cls()
-            try:
-                if choice == 1:
-                    search_product()
-                elif choice == 2:
-                    new_sale()
-                elif choice == 3:
-                    cursor.execute("SELECT DISTINCT invoice_number FROM sales WHERE employee_id=%s", (LOGGED_IN_ID,))
-                    sales_by_emp = cursor.fetchall()
-                    if not sales_by_emp:
-                        print("You have made no sales yet. Get back to work.")
-                        input("Press Enter to continue...")
-                        CURRENT_PAGE = -1
-                        continue
-                    print(f"You have made {len(sales_by_emp)} sales.")
+            print("Welcome to BananaCenter".center(100), "\n\n")
+
+            if not LOGGED_IN:
+                login_details = login()
+                LOGGED_IN = login_details[0]
+                if login_details[0]:
+                    LOGGED_IN_AS = login_details[1]
+                    LOGGED_IN_ID = login_details[2]
+                    print(f"Logged in as: {LOGGED_IN_AS}")
+                    print()
                     input("Press Enter to continue...")
-                elif choice == 5:
+                continue
+
+            if LOGGED_IN_AS == "admin":
+                if CURRENT_PAGE == -1:
+                    # TODO Staff Management: Change login info
+                    choices = ["Inventory Management", "Staff Management", "Sales Report", "Logout", "Exit"]
+                    choice = prompt_menu("Administrator Main Menu", choices)
+                    CURRENT_PAGE = choice
+                else:
+                    choice = CURRENT_PAGE
+                if choice == 1:
+                    inventory_management_menu()
+                elif choice == 2:
+                    staff_management_menu()
+                elif choice == 3:
+                    sales_report_menu()
+                elif choice == 4:
                     LOGGED_IN = False
                     CURRENT_PAGE = -1
-                elif choice == 6:
+                elif choice == 5:
                     break
-            except KeyboardInterrupt:
-                pass
-            finally:
-                CURRENT_PAGE = -1
 
-    except KeyboardInterrupt:
-        if not LOGGED_IN:
-            cls()
-            break
-        continue
+            elif LOGGED_IN_AS == "employee":
+                if CURRENT_PAGE == -1:
+                    choices = ["Search Prouct", "New Sale", "View Sales", "File defect claim", "Logout", "Exit"]
+                    choice = prompt_menu("Employee Main Menu", choices)
+                    CURRENT_PAGE = choice
+                else:
+                    choice = CURRENT_PAGE
+                cls()
+                try:
+                    if choice == 1:
+                        search_product()
+                    elif choice == 2:
+                        new_sale()
+                    elif choice == 3:
+                        cursor.execute("SELECT DISTINCT invoice_number FROM sales WHERE employee_id=%s", (LOGGED_IN_ID,))
+                        sales_by_emp = cursor.fetchall()
+                        if not sales_by_emp:
+                            print("You have made no sales yet. Get back to work.")
+                            input("Press Enter to continue...")
+                            CURRENT_PAGE = -1
+                            continue
+                        print(f"You have made {len(sales_by_emp)} sales.")
+                        input("Press Enter to continue...")
+                    elif choice == 5:
+                        LOGGED_IN = False
+                        CURRENT_PAGE = -1
+                    elif choice == 6:
+                        break
+                except KeyboardInterrupt:
+                    pass
+                finally:
+                    CURRENT_PAGE = -1
+
+        except KeyboardInterrupt:
+            if not LOGGED_IN:
+                cls()
+                break
+            continue
+
+with connect(host="localhost", user="root", password="1234") as db:
+    with db.cursor() as cursor:
+        cursor.execute("""
+                        CREATE DATABASE IF NOT EXISTS BananaCenter;
+                    """)
+    db.database = "BananaCenter"
+    cursor = db.cursor(buffered=True)
+    setup(cursor)
+    db.commit()
+    main()
 
 print("Have a nice day =)")
 
 # TODO what if employee is fired after making sale
+# TODO Same for product
