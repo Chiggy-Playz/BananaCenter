@@ -185,7 +185,7 @@ def search_product(return_value=False):
         return
         
     cursor.execute(
-        "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products WHERE lower(model_number) LIKE %s OR lower(name) LIKE %s",
+        "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products WHERE quantity != -1 AND (lower(model_number) LIKE %s OR lower(name) LIKE %s)",
         (f"%{identifier}%", f"%{identifier}%"),
     )
     data = cursor.fetchall()
@@ -197,13 +197,14 @@ def search_product(return_value=False):
         data = data[user_choice - 1]
     elif len(data) == 1:
         data = data[0]
-
+    
     if return_value:
         return data
 
     if not data:
         print("No product found with that identifier!")
         input("Press Enter to continue...")
+        return
     
     show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [data]),
     input("\n\nPress Enter to continue...")
@@ -261,7 +262,7 @@ def inventory_management_menu():
             # View All
             if view_choice == 1:
                 cursor.execute(
-                    "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products"
+                    "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products WHERE quantity != -1"
                 )
                 data = cursor.fetchall()
                 if not data:
@@ -282,7 +283,7 @@ def inventory_management_menu():
                 if sort_type_choice == 3:
                     continue
                 cls()
-                query = "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products ORDER BY {} {}".format(
+                query = "SELECT model_number, name, price, quantity, discount, price - discount/100 * price FROM products WHERE quantity != -1 ORDER BY {} {}".format(
                     ["Name", "Price", "Quantity", "Discount"][sort_by_choice - 1].lower(),
                     ["ASC", "DESC"][sort_type_choice - 1].lower(),
                 )
@@ -316,8 +317,12 @@ def inventory_management_menu():
                 continue
             try:
                 cursor.execute(
-                    "INSERT INTO products (model_number, name, price, quantity, discount) VALUES (%s, %s, %s, %s, %s)",
-                    (input_data["Model Number"], input_data["Name"], price, float(input_data["Quantity"]), discount),
+                    """INSERT INTO products (model_number, name, price, quantity, discount) 
+                       VALUES (%s, %s, %s, %s, %s)
+                       ON DUPLICATE KEY
+                       UPDATE name = %s, price = %s, quantity = %s, discount = %s;
+                       """,
+                    (input_data["Model Number"], input_data["Name"], price, float(input_data["Quantity"]), discount, input_data["Name"], price, float(input_data["Quantity"]), discount),
                 )
             except errors.DataError:
                 print("Invalid input! Did you enter very long values? Please try again")
@@ -398,7 +403,7 @@ def inventory_management_menu():
             show_table(["Model Number", "Name", "Price", "Quantity", "Discount", "Final Price"], [data])
             print("\n\n")
             if input("Are you sure you want to delete this product? (Y/N): ").lower() == "y":
-                cursor.execute("DELETE FROM products WHERE model_number = %s", (data[0],))
+                cursor.execute("UPDATE products SET quantity=-1 WHERE model_number = %s", (data[0],))
                 db.commit()
                 print("\nProduct deleted!")
                 input("Press Enter to continue...")
@@ -645,7 +650,7 @@ def sales_report_menu():
                 return
             elif filter_by_choice == 3:
                 product_identifier = input("Enter the product name or model number: ").lower()
-                cursor.execute("SELECT name, model_number, price, quantity FROM products WHERE lower(name) LIKE %s OR lower(model_number) LIKE %s", (f"%{product_identifier}%", f"%{product_identifier}%"))
+                cursor.execute("SELECT name, model_number, price, quantity FROM products WHERE quantity != -1 AND (lower(name) LIKE %s OR lower(model_number) LIKE %s)", (f"%{product_identifier}%", f"%{product_identifier}%"))
                 products = cursor.fetchall()
                 # No product found
                 if not products:
@@ -850,3 +855,4 @@ print("Have a nice day =)")
 # TODO what if employee is fired after making sale
 # TODO Same for product
 # TODO Remove employee level
+# TODO Add export sale to txt
