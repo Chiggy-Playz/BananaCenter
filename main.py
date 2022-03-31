@@ -9,7 +9,7 @@ import os
 from typing import List, Tuple, Dict, Any, Optional
 from random import randint, choice as randchoice
 from datetime import datetime
-
+print("Starting...")
 LOGGED_IN = False
 LOGGED_IN_AS = ""
 CURRENT_PAGE = -1
@@ -471,10 +471,10 @@ def staff_management_menu():
                 for i in range(5)
             ]
             show_table(["S. No", "Name", "Date of Birth", "Past Experience", "Expected Base Pay"], employees)
-            print("\n\nChoose an employee to hire by entering the S. No. of the employee. Enter 6 to go back.")
-            user_choice = prompt_input_int("\n> ", 1, 6)
+            print("\n\nChoose an employee to hire by entering the S. No. of the employee. Enter 0 to go back.")
+            user_choice = prompt_input_int("\n> ", 0, 5)
                 
-            if user_choice == 6:
+            if user_choice == 0:
                 choice = -1
                 continue
             
@@ -522,10 +522,10 @@ def staff_management_menu():
                 input("Press Enter to continue...")
                 continue
             
-            show_table(["Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [emp[1:] for emp in data])
-            print(f"\n\nSelect the employee you want to fire by entering the S. No. of the employee. Enter {len(data)+1} to go back.")
-            user_choice = prompt_input_int("\n> ", 1, len(data)+1)
-            if user_choice == len(data) + 1:
+            show_table(["S. No", "Name", "Age", "Date of Joining", "Base Salary", '"Level"'], [(i+1,) + emp[1:] for i, emp in enumerate(data)])
+            print(f"\n\nSelect the employee you want to fire by entering the S. No. of the employee. Enter 0 to go back.")
+            user_choice = prompt_input_int("\n> ", 0, len(data))
+            if user_choice == 0:
                 choice = -1
                 continue
             selected_employee = data[user_choice-1]
@@ -707,7 +707,7 @@ def new_sale():
     cls()
     while True:
         customer_number = input("Enter the phone number of the customer: ")
-        if customer_number.isnumeric():
+        if customer_number.isnumeric() and len(customer_number) == 10:
             break
         print("Invalid phone number!")
         input("Press Enter to try again...")
@@ -792,7 +792,7 @@ def main():
 
             elif LOGGED_IN_AS == "employee":
                 if CURRENT_PAGE == -1:
-                    choices = ["Search Prouct", "New Sale", "View Sales", "File defect claim", "Logout", "Exit"]
+                    choices = ["Search Prouct", "New Sale", "View Sales", "Logout", "Exit"]
                     choice = prompt_menu("Employee Main Menu", choices)
                     CURRENT_PAGE = choice
                 else:
@@ -813,10 +813,10 @@ def main():
                             continue
                         print(f"You have made {len(sales_by_emp)} sales.")
                         input("Press Enter to continue...")
-                    elif choice == 5:
+                    elif choice == 4:
                         LOGGED_IN = False
                         CURRENT_PAGE = -1
-                    elif choice == 6:
+                    elif choice == 5:
                         break
                 except KeyboardInterrupt:
                     pass
@@ -828,6 +828,7 @@ def main():
                 cls()
                 break
             continue
+
 
 with connect(host="localhost", user="root", password="1234") as db:
     with db.cursor() as cursor:
@@ -844,3 +845,4 @@ print("Have a nice day =)")
 
 # TODO what if employee is fired after making sale
 # TODO Same for product
+# TODO Remove employee level
