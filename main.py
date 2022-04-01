@@ -342,7 +342,8 @@ def inventory_management_menu():
             )
             discount = input_data["Discount (leave blank for 0)"]
             price = float(input_data["Price"])
-
+            quantity = int(input_data["Quantity"])
+            
             if discount < 0 or discount > 100:
                 print("Discount must be between 0 and 100!")
                 input("Press Enter to continue...")
