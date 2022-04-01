@@ -6,10 +6,11 @@ except ModuleNotFoundError:
     quit()
 
 import os
-from typing import List, Tuple, Dict, Any, Optional
 from random import randint, choice as randchoice
 from datetime import datetime
+
 print("Starting...")
+
 LOGGED_IN = False
 LOGGED_IN_AS = ""
 CURRENT_PAGE = -1
@@ -50,7 +51,7 @@ def cls():
     os.system("cls" if os.name == "nt" else "clear")
 
 
-def login() -> Tuple[bool, str, int]:
+def login():
     username = input("Login Username: ")
     password = input("Login Password: ")
     cursor.execute("SELECT role, employee_id FROM logins WHERE username = %s AND password = %s", (username, password))
@@ -64,7 +65,7 @@ def login() -> Tuple[bool, str, int]:
         return (False, "", -1)
 
 
-def prompt_input_int(input_str:str, minimum: int, maximum: Optional[int]=None):
+def prompt_input_int(input_str, minimum, maximum=None):
     while True:
         try:
             user_choice = input(input_str)
@@ -78,7 +79,7 @@ def prompt_input_int(input_str:str, minimum: int, maximum: Optional[int]=None):
             return int(user_choice)
 
 
-def prompt_menu(page_name: str, choices: List[str]) -> int:
+def prompt_menu(page_name, choices) -> int:
 
     while True:
         cls()
@@ -100,7 +101,7 @@ def prompt_menu(page_name: str, choices: List[str]) -> int:
             return user_choice
 
 
-def show_table(columns: List[str], rows: List[Tuple], to_cls=True, return_string=False) -> Optional[str]:
+def show_table(columns, rows, to_cls=True, return_string=False):
     if to_cls:
         cls()
     space_deltas = []
@@ -112,56 +113,38 @@ def show_table(columns: List[str], rows: List[Tuple], to_cls=True, return_string
         space_deltas.append(delta + 1)
 
     # ----------
-    # print("+", end="")
     s = "+"
     for i, col in enumerate(columns):
-        # print(f"-" * (len(col) + space_deltas[i] + 1), end="")
-        # print("+", end="")
         s += f"-" * (len(col) + space_deltas[i] + 1)
         s += "+"
-    # print()
     s += "\n"
     # Columns
     for i, col in enumerate(columns):
-        # print("| ", end="")
-        # print(f"{col}" + " " * space_deltas[i], end="")
         s += "| "
         s += f"{col}" + " " * space_deltas[i]
-    # print("|\n", end="")
     s += "|\n"
     # ---------
-    # print("|", end="")
     s += "|"
     for i, col in enumerate(columns):
-        # print(f"-" * (len(col) + space_deltas[i] + 1), end="")
-        # print("+" if i != len(columns) - 1 else "|", end="")
         s += f"-" * (len(col) + space_deltas[i] + 1)
         s += "+" if i != len(columns) - 1 else "|"
     # Rows
     for i, row in enumerate(rows):
-        # print("\n| ", end="")
         s += "\n| "
         for j, col in enumerate(row):
-            # print(f"{col}" + " " * (space_deltas[j] - len(str(col)) + len(columns[j])), end="")
-            # print("| ", end="")
             s += f"{col}" + " " * (space_deltas[j] - len(str(col)) + len(columns[j]))
             s += "| "
     # ----------
-    # print()
     s += "\n"
-    # print("+", end="")
     s += "+"
     for i, col in enumerate(columns):
-        # print(f"-" * (len(col) + space_deltas[i] + 1), end="")
-        # print("+", end="")
         s += f"-" * (len(col) + space_deltas[i] + 1)
         s += "+"
     if return_string:
         return s
     print(s)
 
-
-def prompt_input(required_columns: dict, optional_columns: dict) -> Dict[str, Any]:
+def prompt_input(required_columns, optional_columns):
     result = {}
     for column in required_columns:
         while True:
@@ -243,7 +226,7 @@ def get_detailed_sale(invoice_number):
     s += f"Date of Sale: {sale_date}\n"
     s += f"Mode of Payment: {payment_method}\n"
     s += f"\nProducts Sold:\n"
-    s +=  show_table(["Product Name", "Price", "Quantity", "Discount", "Final Price"], [(row[7], row[8], row[10], row[9], f"{row[11]:.2f}") for row in data] + [("","","","",""),("", "", "", "Total", f"{sum([row[11] for row in data]):.2f}")], to_cls=False, return_string=True)  # type: ignore
+    s +=  show_table(["Product Name", "Price", "Quantity", "Discount", "Final Price"], [(row[7], row[8], row[10], row[9], f"{row[11]:.2f}") for row in data] + [("","","","",""),("", "", "", "Total", f"{sum([row[11] for row in data]):.2f}")], to_cls=False, return_string=True)
     return s
 
 
@@ -738,7 +721,7 @@ def sales_report_menu():
 def new_sale():
     global CURRENT_PAGE
     # Model Number : Product Info
-    products: Dict[str, dict] = {}
+    products = {}
     while True:
         cls()
         product = search_product(return_value=True)
@@ -758,7 +741,7 @@ def new_sale():
             quantity = 1
         else:
             quantity = prompt_input_int("Enter the quantity: ", 1, product[3])
-        model_number: str = product[0]
+        model_number = product[0]
         products[model_number] = {"Model Number": model_number, "Name": product[1], "Price": product[2], "Quantity": quantity, "Discount": product[4], "Final Price": product[5] * quantity}
         
         if input("\n\nDo you want to add more products? (Y/N): ").lower() == "n":
@@ -831,7 +814,6 @@ def main():
 
             if LOGGED_IN_AS == "admin":
                 if CURRENT_PAGE == -1:
-                    # TODO Staff Management: Change login info
                     choices = ["Inventory Management", "Staff Management", "Sales Report", "Logout", "Exit"]
                     choice = prompt_menu("Administrator Main Menu", choices)
                     CURRENT_PAGE = choice
