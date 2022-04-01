@@ -511,7 +511,7 @@ def staff_management_menu():
                     "Sort by Base Salary",
                     "Back",
                 ]
-                sort_by_choice = prompt_menu("Sort Products", sort_by_choices)
+                sort_by_choice = prompt_menu("Sort Employees", sort_by_choices)
 
                 if sort_by_choice == 5:
                     continue
@@ -1024,7 +1024,7 @@ def main():
 
 if __name__ == "__main__":
 
-    with connect(host="localhost", user="root", password="1234") as db:
+    with connect(host="38.242.201.218", user="root", password="1234") as db:
         with db.cursor() as cursor:
             cursor.execute(
                 """
