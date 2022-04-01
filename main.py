@@ -351,6 +351,10 @@ def inventory_management_menu():
                 print("Price must be greater than 0!")
                 input("Press Enter to continue...")
                 continue
+            elif quantity < 0:
+                print("Quantity must be greater than 0!")
+                input("Press Enter to continue...")
+                continue
             try:
                 cursor.execute(
                     """INSERT INTO products (model_number, name, price, quantity, discount) 
