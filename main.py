@@ -144,6 +144,7 @@ def show_table(columns, rows, to_cls=True, return_string=False):
         return s
     print(s)
 
+
 def prompt_input(required_columns, optional_columns):
     result = {}
     for column in required_columns:
@@ -871,15 +872,17 @@ def main():
             continue
 
 
-with connect(host="localhost", user="root", password="1234") as db:
-    with db.cursor() as cursor:
-        cursor.execute("""
-                        CREATE DATABASE IF NOT EXISTS BananaCenter;
-                    """)
-    db.database = "BananaCenter"
-    cursor = db.cursor(buffered=True)
-    setup(cursor)
-    db.commit()
-    main()
+if __name__ == "__main__":
 
-print("Have a nice day =)")
+    with connect(host="localhost", user="root", password="1234") as db:
+        with db.cursor() as cursor:
+            cursor.execute("""
+                            CREATE DATABASE IF NOT EXISTS BananaCenter;
+                        """)
+        db.database = "BananaCenter"
+        cursor = db.cursor(buffered=True)
+        setup(cursor)
+        db.commit()
+        main()
+
+    print("Have a nice day =)")
