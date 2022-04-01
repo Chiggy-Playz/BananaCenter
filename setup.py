@@ -67,8 +67,8 @@ def setup(cur):
     cur.execute("ALTER TABLE sales ADD FOREIGN KEY (customer_id) REFERENCES customers(id);")
     cur.execute("ALTER TABLE sales ADD FOREIGN KEY (product_model_number) REFERENCES products(model_number);")
     try:
-        cur.execute("""INSERT INTO logins (username, password, role, employee_id) VALUES ('admin', 'admin', 'admin', NULL);""")
+        cur.execute(
+            """INSERT INTO logins (username, password, role, employee_id) VALUES ('admin', 'admin', 'admin', NULL);"""
+        )
     except IntegrityError:
         pass  # admin row already exists
-
-
