@@ -87,7 +87,7 @@ def prompt_menu(page_name, choices) -> int:
         print("Choose an option:")
         for i, choice in enumerate(choices):
             print(f"{i + 1}: {choice}")
-        user_choice = input("\n> ")
+        user_choice = input("\n> ") 
         try:
             user_choice = int(user_choice)
             if user_choice < 1 or user_choice > len(choices):
@@ -678,7 +678,7 @@ def sales_report_menu():
 
             cls()
             query = "SELECT S.invoice_number, E.name AS 'Employee name', C.name AS 'Customer Name', C.phone, S.sale_date, S.payment_method, SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price))) AS 'Total Amount' FROM sales S, staff E, customers C WHERE S.employee_id = E.id AND S.customer_id = C.id GROUP BY invoice_number ORDER BY {} {};".format(
-                ["sale_date", "Total Amount"][sort_by_choice - 1],
+                ["sale_date", "SUM(S.quantity* (S.base_price - ((S.discount/100) * S.base_price)))"][sort_by_choice - 1],
                 ["ASC", "DESC"][sort_type_choice - 1],
             )
             cursor.execute(query)
@@ -810,7 +810,7 @@ def sales_report_menu():
                 return
         # Export Sale
         elif choice == 4:
-            print("\n\nEnter the invoice number of the sale you want to view. Enter 0 to go back.")
+            print("\n\nEnter the invoice number of the sale you want to export. Enter 0 to go back.")
             invoice_number = prompt_input_int("Invoice Number: ", 0)
             if invoice_number == 0:
                 CURRENT_PAGE = -1
@@ -1029,7 +1029,7 @@ def main():
 
 if __name__ == "__main__":
 
-    with connect(host="38.242.201.218", user="root", password="1234") as db:
+    with connect(host="localhost", user="root", password="1234") as db:
         with db.cursor() as cursor:
             cursor.execute(
                 """
