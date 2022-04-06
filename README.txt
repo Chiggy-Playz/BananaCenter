@@ -4,6 +4,8 @@ This project was made by Chirag Garg, Mayank Gauchhwal and Ojas Kumar of class 1
 
 This project was developed and tested on:
 Windows 10 v1909
+
+Using:
 MySQL Database Verion 8.0.26
 Python 3.8.3
 
